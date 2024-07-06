@@ -1,44 +1,31 @@
 const express = require('express');
+const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
-const bcrypt = require('bcrypt');
-const mysql = require('mysql2');
-require('dotenv').config();
-
 const app = express();
+const dotenv = require('dotenv')
+dotenv.config()
+
+// Middleware
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
+app.use(express.static('public'));
 
-const db = mysql.createConnection({
-    host: process.env.DB_HOST,
-    user: process.env.DB_USER,
-    password: process.env.DB_PASSWORD,
-    database: process.env.DB_NAME
-});
+// View Engine
+app.set('view engine', 'ejs');
 
-db.connect();
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_SRV, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => console.log('MongoDB connected...'))
+    .catch(err => console.log(err));
 
-app.get('/', (req, res) => {
-    res.sendFile(__dirname + '/views/index.html');
-});
+// Routes
+const indexRoutes = require('./routes/index');
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+app.use('/', indexRoutes);
+app.use('/auth', authRoutes);
+app.use('/', userRoutes);
 
-app.post('/register', async (req, res) => {
-    const { username, email, password, first_name, last_name, date_of_birth, profile_picture_url, bio } = req.body;
-
-    if (!username || !email || !password) {
-        return res.status(400).send('Username, email, and password are required.');
-    }
-
-    const password_hash = await bcrypt.hash(password, 10);
-
-    const sql = 'INSERT INTO users (username, email, password_hash, first_name, last_name, date_of_birth, profile_picture_url, bio) VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
-    db.query(sql, [username, email, password_hash, first_name, last_name, date_of_birth, profile_picture_url, bio], (err, result) => {
-        if (err) {
-            console.error(err);
-            return res.status(500).send('Internal server error');
-        }
-        res.send('User registered successfully!');
-    });
-});
-
-app.listen(3000, () => {
-    console.log('Server is running on port 3000');
-});
+// Start Server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
